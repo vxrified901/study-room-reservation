@@ -1,0 +1,6 @@
+
+--- a/app.py
++++ b/app.py
+@@ -46,1 +46,1 @@
+-        html += f"<p>{name} - Capacity: {capacity}</p>"
++        html += f"<p>{name} - Capacity: {capacity + 1}</p>"
