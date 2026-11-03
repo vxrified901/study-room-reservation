@@ -1,0 +1,26 @@
+
+import sqlite3
+
+import app
+
+
+def test_view_rooms_reads_database(tmp_path, monkeypatch):
+    database = tmp_path / "test_rooms.db"
+    monkeypatch.setattr(app, "DATABASE", str(database))
+
+    app.initialize_database()
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "UPDATE rooms SET capacity = 10 WHERE name = ?",
+            ("Library Room 101",)
+        )
+        connection.commit()
+
+    client = app.app.test_client()
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert b"Library Room 101" in response.data
+    assert b"Capacity: 10" in response.data
+    assert b"Capacity: 4" not in response.data
