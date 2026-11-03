@@ -32,12 +32,18 @@ def initialize_database():
             )
 
 
-@app.route("/")
-def view_rooms():
+def get_rooms():
     with sqlite3.connect(DATABASE) as connection:
         rooms = connection.execute(
             "SELECT name, capacity FROM rooms"
         ).fetchall()
+
+    return rooms
+
+
+@app.route("/")
+def view_rooms():
+    rooms = get_rooms()
 
     html = "<h1>Campus Study Room Reservation System</h1>"
     html += "<h2>Available Study Rooms</h2>"
