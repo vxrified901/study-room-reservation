@@ -1,10 +1,59 @@
 
-from flask import Flask
+from flask import Flask, g, request, has_request_context
 import sqlite3
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
 
 app = Flask(__name__)
-
 DATABASE = "rooms.db"
+
+logger = logging.getLogger("study_room_app")
+logger.setLevel(logging.INFO)
+
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logger.addHandler(handler)
+
+logger.propagate = False
+
+
+def log_event(event, level="INFO", **details):
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "level": level,
+        "event": event,
+        "request_id": (
+            getattr(g, "request_id", None)
+            if has_request_context() else None
+        ),
+        **details,
+    }
+
+    message = json.dumps(record)
+
+    if level == "ERROR":
+        logger.error(message)
+    else:
+        logger.info(message)
+
+
+@app.before_request
+def start_request():
+    g.request_id = uuid.uuid4().hex
+    log_event("request_started", path=request.path)
+
+
+@app.after_request
+def finish_request(response):
+    log_event(
+        "request_completed",
+        path=request.path,
+        status=response.status_code,
+    )
+    return response
 
 
 def initialize_database():
@@ -27,18 +76,28 @@ def initialize_database():
                 [
                     ("Library Room 101", 4),
                     ("Library Room 102", 6),
-                    ("Engineering Room 201", 8)
-                ]
+                    ("Engineering Room 201", 8),
+                ],
             )
 
 
 def get_rooms():
-    with sqlite3.connect(DATABASE) as connection:
-        rooms = connection.execute(
-            "SELECT name, capacity FROM rooms"
-        ).fetchall()
+    try:
+        with sqlite3.connect(DATABASE) as connection:
+            rooms = connection.execute(
+                "SELECT name, capacity FROM rooms"
+            ).fetchall()
 
-    return rooms
+        log_event("rooms_loaded", room_count=len(rooms))
+        return rooms
+
+    except sqlite3.Error as error:
+        log_event(
+            "database_error",
+            level="ERROR",
+            error_type=type(error).__name__,
+        )
+        raise
 
 
 @app.route("/")
